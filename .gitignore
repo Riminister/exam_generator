@@ -16,71 +16,57 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # Virtual environments
 venv/
 env/
 ENV/
-env.bak/
-venv.bak/
 queens_exam_env/
+.venv
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
+# Environment variables and secrets
+.env
+.streamlit/secrets.toml
+*.key
+*.pem
+
+# Data files (optional - uncomment if you don't want to commit data)
+# data/
+# *.json
+# *.csv
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Project specific
-exam_downloads/*.pdf
+# Logs
 *.log
-*.tmp
-*.temp
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Generated files
+generated_questions_openai.json
+generated_exam_example.json
+outputs/
+generated_graphs/
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Database
-*.db
-*.sqlite3
-
-# Chrome driver
-chromedriver.exe
-chromedriver
-
-# Selenium
-geckodriver.log
-
-# Analysis outputs
-exam_analysis_dashboard.png
-exam_analysis.json
-*.csv
-*.xlsx
+# Test files
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Temporary files
-temp/
-tmp/
-cache/
+*.tmp
+*.temp

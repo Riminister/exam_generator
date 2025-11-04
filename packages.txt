@@ -1,0 +1,10 @@
+# System packages for Streamlit Cloud deployment
+# These are installed on the server before Python packages
+
+# For poppler (PDF processing)
+poppler-utils
+
+# For Tesseract OCR (if needed)
+tesseract-ocr
+tesseract-ocr-eng
+
