@@ -71,6 +71,33 @@ def load_existing_questions():
     return None
 
 
+def get_econ_courses():
+    """Get list of ECON courses from the data"""
+    data = load_existing_questions()
+    if not data:
+        return []
+    
+    courses = set()
+    for exam in data.get('exams', []):
+        # Try to get course code from exam
+        course_code = exam.get('course_code')
+        
+        # If not available, try to extract from filename
+        if not course_code:
+            filename = exam.get('filename', '')
+            # Extract ECON code from filename (e.g., ECON212, ECON222)
+            import re
+            match = re.search(r'ECON\d{3}', filename.upper())
+            if match:
+                course_code = match.group(0)
+        
+        # Only add ECON courses
+        if course_code and course_code.upper().startswith('ECON'):
+            courses.add(course_code.upper())
+    
+    return sorted(list(courses))
+
+
 def generate_question_with_openai(topic: str, question_type: str, difficulty: str, course_subject: str):
     """Generate a question using OpenAI"""
     if not OPENAI_AVAILABLE:
@@ -142,6 +169,27 @@ def render_generate_page():
         """)
         return
     
+    # Get available ECON courses
+    econ_courses = get_econ_courses()
+    
+    if not econ_courses:
+        st.warning("⚠️ No ECON courses found in your data. Please process some ECON exams first.")
+        st.info("The app will restrict to ECON courses only.")
+        default_course = "Economics"
+    else:
+        # Auto-select first course (or use session state to remember selection)
+        if 'selected_econ_course' not in st.session_state:
+            st.session_state.selected_econ_course = econ_courses[0]
+        
+        selected_course = st.selectbox(
+            "Select ECON Course",
+            econ_courses,
+            index=econ_courses.index(st.session_state.selected_econ_course) if st.session_state.selected_econ_course in econ_courses else 0,
+            help=f"Found {len(econ_courses)} ECON course(s) in your data"
+        )
+        st.session_state.selected_econ_course = selected_course
+        default_course = selected_course
+    
     # Input form
     col1, col2 = st.columns(2)
     
@@ -157,7 +205,8 @@ def render_generate_page():
             "Difficulty",
             ["easy", "medium", "hard"]
         )
-        course_subject = st.text_input("Course Subject", placeholder="e.g., Economics")
+        # Auto-fill course subject with selected ECON course
+        course_subject = st.text_input("Course Subject", value=default_course, help="Auto-filled from selected ECON course")
     
     # Generate button
     if st.button("🚀 Generate Question", type="primary"):
@@ -216,13 +265,28 @@ def render_question_bank_page():
         st.info("No questions found. Generate some questions first!")
         return
     
-    # Extract all questions
+    # Extract all questions with course codes
     all_questions = []
     for exam in data.get('exams', []):
+        # Get course code from exam level
+        exam_course_code = exam.get('course_code')
+        
+        # If not available, extract from filename
+        if not exam_course_code:
+            filename = exam.get('filename', '')
+            import re
+            match = re.search(r'ECON\d{3}', filename.upper())
+            if match:
+                exam_course_code = match.group(0)
+            else:
+                exam_course_code = 'Unknown'
+        
+        # Add course code to each question
         for q in exam.get('questions', []):
-            q['exam_filename'] = exam.get('filename', 'Unknown')
-            q['course_code'] = exam.get('course_code', 'Unknown')
-            all_questions.append(q)
+            q_copy = q.copy()
+            q_copy['exam_filename'] = exam.get('filename', 'Unknown')
+            q_copy['course_code'] = exam_course_code
+            all_questions.append(q_copy)
     
     if not all_questions:
         st.info("No questions in the bank yet.")
@@ -235,7 +299,16 @@ def render_question_bank_page():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        course_codes = sorted(set(q.get('course_code', 'Unknown') for q in all_questions))
+        # Get unique course codes (handle None values safely)
+        course_codes_set = set()
+        for q in all_questions:
+            course_code = q.get('course_code')
+            if course_code:
+                course_codes_set.add(str(course_code))
+            else:
+                course_codes_set.add('Unknown')
+        
+        course_codes = sorted(list(course_codes_set))
         selected_course = st.selectbox("Course", ["All"] + course_codes)
     
     with col2:
@@ -248,7 +321,7 @@ def render_question_bank_page():
     # Filter questions
     filtered_questions = all_questions
     if selected_course != "All":
-        filtered_questions = [q for q in filtered_questions if q.get('course_code') == selected_course]
+        filtered_questions = [q for q in filtered_questions if str(q.get('course_code', 'Unknown')) == selected_course]
     if selected_type != "All":
         filtered_questions = [q for q in filtered_questions if q.get('question_type') == selected_type]
     if search_term:
@@ -257,13 +330,19 @@ def render_question_bank_page():
     st.metric("Filtered Results", len(filtered_questions))
     
     # Display questions
-    for i, question in enumerate(filtered_questions[:20]):  # Show first 20
-        with st.expander(f"Question {i+1}: {question.get('text', '')[:50]}..."):
-            st.write(f"**Text:** {question.get('text', 'N/A')}")
-            st.write(f"**Type:** {question.get('question_type', 'N/A')}")
-            st.write(f"**Course:** {question.get('course_code', 'N/A')}")
-            st.write(f"**Difficulty Score:** {question.get('difficulty_score', 'N/A')}")
-            st.write(f"**Marks:** {question.get('question_marks', 'N/A')}")
+    if not filtered_questions:
+        st.info("No questions match your filters. Try adjusting your search criteria.")
+    else:
+        for i, question in enumerate(filtered_questions[:20]):  # Show first 20
+            question_text = question.get('text', '')
+            preview_text = question_text[:50] + "..." if len(question_text) > 50 else question_text
+            with st.expander(f"Question {i+1}: {preview_text}"):
+                st.write(f"**Text:** {question_text}")
+                st.write(f"**Type:** {question.get('question_type', 'N/A')}")
+                st.write(f"**Course:** {question.get('course_code', 'N/A')}")
+                st.write(f"**Difficulty Score:** {question.get('difficulty_score', 'N/A')}")
+                st.write(f"**Marks:** {question.get('question_marks', 'N/A')}")
+                st.write(f"**From:** {question.get('exam_filename', 'N/A')}")
 
 
 def render_build_exam_page():
