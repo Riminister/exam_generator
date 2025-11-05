@@ -329,6 +329,7 @@ def render_generate_page():
                                 placeholder="Type your answer here...",
                                 key=f"text_answer_{hash(question.get('question', ''))}"
                             )
+                            
                     else:
                         # Text input for other question types
                         user_answer = st.text_area(
