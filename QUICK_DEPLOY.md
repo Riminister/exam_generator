@@ -35,7 +35,11 @@ git push -u origin main
    - Select branch (`main` or `master`)
 
 3. **Configure App**
-   - **Main file path:** `web_ui/streamlit_app.py`
+   - **Main file path:** Use the direct GitHub URL to the file:
+     ```
+     https://github.com/Riminister/exam_generator/blob/master/web_ui/streamlit_app.py
+     ```
+     OR just the relative path: `web_ui/streamlit_app.py`
    - Python version: Auto-detected (3.9 or 3.10)
 
 4. **Add Secrets (for OpenAI)**

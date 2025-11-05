@@ -24,15 +24,18 @@ except ImportError:
     pymupdf = None
 
 # OCR imports
+pytesseract = None
+pdf2image = None
 try:
     import pytesseract
     from PIL import Image
-    try:
-        import pdf2image
-    except ImportError:
-        pdf2image = None
 except ImportError:
-    pytesseract = None
+    pass
+
+try:
+    import pdf2image
+except ImportError:
+    pass
 
 # Import our modules (relative imports since in same directory)
 from .ocr_context_selector import OCRContextSelector
