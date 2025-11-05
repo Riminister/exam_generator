@@ -284,6 +284,7 @@ def render_generate_page():
             # Show answer button
             if question.get("answer"):
 
+
                 # Use a unique key for each question to track answer visibility
                 answer_key = f"show_answer_{hash(question.get('question', ''))}"
                 
@@ -402,59 +403,6 @@ def render_build_exam_page():
     """Render the exam builder page"""
     st.header("📝 Build Exam")
     st.info("🚧 Exam builder coming soon! This will let you select questions and create a complete exam.")
-
-
-def render_statistics_page():
-    """Render statistics dashboard"""
-    st.header("📊 Statistics")
-    
-    data = load_existing_questions()
-    if not data:
-        st.info("No data available. Process some exams first!")
-        return
-    
-    # Calculate statistics
-    total_exams = len(data.get('exams', []))
-    all_questions = []
-    for exam in data.get('exams', []):
-        all_questions.extend(exam.get('questions', []))
-    
-    total_questions = len(all_questions)
-    
-    # Display metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Exams", total_exams)
-    with col2:
-        st.metric("Total Questions", total_questions)
-    with col3:
-        avg_questions = total_questions / total_exams if total_exams > 0 else 0
-        st.metric("Avg Questions/Exam", f"{avg_questions:.1f}")
-    with col4:
-        courses = set(exam.get('course_code') for exam in data.get('exams', []) if exam.get('course_code'))
-        st.metric("Unique Courses", len(courses))
-    
-    # Question type distribution
-    if PANDAS_AVAILABLE and all_questions:
-        st.subheader("Question Type Distribution")
-        question_types = [q.get('question_type', 'unknown') for q in all_questions]
-        type_counts = pd.Series(question_types).value_counts()
-        st.bar_chart(type_counts)
-    
-    # Course distribution
-    if all_questions:
-        st.subheader("Questions by Course")
-        course_counts = {}
-        for q in all_questions:
-            course = q.get('course_code', 'Unknown')
-            course_counts[course] = course_counts.get(course, 0) + 1
-        
-        if PANDAS_AVAILABLE:
-            st.bar_chart(pd.Series(course_counts))
-        else:
-            for course, count in sorted(course_counts.items(), key=lambda x: x[1], reverse=True):
-                st.write(f"**{course}**: {count} questions")
 
 
 if __name__ == "__main__":
