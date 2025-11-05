@@ -205,8 +205,8 @@ def render_generate_page():
             "Difficulty",
             ["easy", "medium", "hard"]
         )
-        # Auto-fill course subject with selected ECON course
-        course_subject = st.text_input("Course Subject", value=default_course, help="Auto-filled from selected ECON course")
+        # Course subject is automatically set from selected ECON course
+        course_subject = default_course
     
     # Generate button
     if st.button("🚀 Generate Question", type="primary"):
