@@ -98,6 +98,27 @@ def get_econ_courses():
     return sorted(list(courses))
 
 
+def load_syllabus_topics():
+    """Load syllabus topics from JSON file"""
+    try:
+        topics_file = project_root / "data" / "syllabus_topics.json"
+        if topics_file.exists():
+            with open(topics_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        st.error(f"Error loading syllabus topics: {e}")
+    return {}
+
+
+def get_course_topics(course_code: str) -> List[str]:
+    """Get topics for a specific course"""
+    topics_data = load_syllabus_topics()
+    course_data = topics_data.get(course_code.upper())
+    if course_data:
+        return course_data.get('topics', [])
+    return []
+
+
 def generate_question_with_openai(topic: str, question_type: str, difficulty: str, course_subject: str):
     """Generate a question using OpenAI"""
     if not OPENAI_AVAILABLE:
@@ -125,7 +146,7 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio(
         "Choose a page",
-        ["Generate Questions", "Question Bank", "Build Exam", "Statistics"]
+        ["Generate Questions", "Question Bank", "Build Exam"]
     )
     
     if page == "Generate Questions":
@@ -134,8 +155,6 @@ def main():
         render_question_bank_page()
     elif page == "Build Exam":
         render_build_exam_page()
-    elif page == "Statistics":
-        render_statistics_page()
 
 
 def render_generate_page():
@@ -190,11 +209,30 @@ def render_generate_page():
         st.session_state.selected_econ_course = selected_course
         default_course = selected_course
     
+    # Get topics for selected course
+    course_topics = get_course_topics(default_course) if default_course != "Economics" else []
+    
     # Input form
     col1, col2 = st.columns(2)
     
     with col1:
-        topic = st.text_input("Topic", placeholder="e.g., supply and demand")
+        if course_topics:
+            # Show dropdown if topics are available
+            topic = st.selectbox(
+                "Topic",
+                ["Select a topic..."] + course_topics,
+                help=f"Topics from {default_course} syllabus"
+            )
+            if topic == "Select a topic...":
+                topic = None
+        else:
+            # Show text input if no topics available
+            topic = st.text_input(
+                "Topic",
+                placeholder="e.g., supply and demand",
+                help=f"No syllabus topics found for {default_course}. Add syllabus to data/syllabi/ folder and run extract_syllabus_topics.py"
+            )
+        
         question_type = st.selectbox(
             "Question Type",
             ["multiple_choice", "short_answer", "essay", "true_false", "numerical"]
@@ -234,11 +272,6 @@ def render_generate_page():
             st.markdown("### Generated Question")
             st.markdown(f'<div class="question-card">{question.get("question", "No question")}</div>', unsafe_allow_html=True)
             
-            # Display answer if available
-            if question.get("answer"):
-                with st.expander("View Answer"):
-                    st.write(question["answer"])
-            
             # Display metadata
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -247,6 +280,26 @@ def render_generate_page():
                 st.metric("Difficulty", question.get("difficulty", "N/A"))
             with col3:
                 st.metric("Topic", question.get("topic", "N/A"))
+            
+            # Show answer button
+            if question.get("answer"):
+
+                # Use a unique key for each question to track answer visibility
+                answer_key = f"show_answer_{hash(question.get('question', ''))}"
+                
+                if answer_key not in st.session_state:
+                    st.session_state[answer_key] = False
+                
+                if not st.session_state[answer_key]:
+                    if st.button("🔍 Show Answer", type="secondary", key="show_ans_btn"):
+                        st.session_state[answer_key] = True
+                        st.rerun()
+                else:
+                    st.markdown("### Answer")
+                    st.markdown(f'<div class="question-card">{question["answer"]}</div>', unsafe_allow_html=True)
+                    if st.button("🔄 Hide Answer", key="hide_ans_btn"):
+                        st.session_state[answer_key] = False
+                        st.rerun()
             
             # Save option
             if st.button("💾 Save Question"):
