@@ -25,6 +25,12 @@ except ImportError:
     st.error("⚠️ OpenAI module not found. Install with: pip install openai")
 
 try:
+    from web_ui.answer_tracker import AnswerTracker, extract_multiple_choice_options
+    ANSWER_TRACKER_AVAILABLE = True
+except ImportError:
+    ANSWER_TRACKER_AVAILABLE = False
+
+try:
     import pandas as pd
     PANDAS_AVAILABLE = True
 except ImportError:
@@ -281,26 +287,122 @@ def render_generate_page():
             with col3:
                 st.metric("Topic", question.get("topic", "N/A"))
             
-            # Show answer button
+            # Interactive answer section
             if question.get("answer"):
-
-
-                # Use a unique key for each question to track answer visibility
                 answer_key = f"show_answer_{hash(question.get('question', ''))}"
+                submit_key = f"submit_answer_{hash(question.get('question', ''))}"
                 
                 if answer_key not in st.session_state:
                     st.session_state[answer_key] = False
+                if submit_key not in st.session_state:
+                    st.session_state[submit_key] = False
                 
-                if not st.session_state[answer_key]:
-                    if st.button("🔍 Show Answer", type="secondary", key="show_ans_btn"):
-                        st.session_state[answer_key] = True
-                        st.rerun()
+                # Get question stats if available
+                question_stats = None
+                if ANSWER_TRACKER_AVAILABLE:
+                    tracker = AnswerTracker()
+                    question_stats = tracker.get_question_stats(question.get('question', ''))
+                
+                if not st.session_state[submit_key]:
+                    # Show answer input before revealing
+                    st.markdown("---")
+                    st.markdown("### Your Answer")
+                    
+                    question_type = question.get("question_type", "").lower()
+                    user_answer = None
+                    
+                    if "multiple_choice" in question_type or "multiple choice" in question_type.lower():
+                        # Try to extract options from answer text
+                        answer_text = question.get("answer", "")
+                        options = extract_multiple_choice_options(answer_text) if ANSWER_TRACKER_AVAILABLE else None
+                        
+                        if options and len(options) > 1:
+                            user_answer = st.radio(
+                                "Select your answer:",
+                                options,
+                                key=f"mc_answer_{hash(question.get('question', ''))}"
+                            )
+                        else:
+                            # Fallback to text input
+                            user_answer = st.text_input(
+                                "Enter your answer:",
+                                placeholder="Type your answer here...",
+                                key=f"text_answer_{hash(question.get('question', ''))}"
+                            )
+                    else:
+                        # Text input for other question types
+                        user_answer = st.text_area(
+                            "Enter your answer:",
+                            placeholder="Type your answer here...",
+                            height=100,
+                            key=f"text_answer_{hash(question.get('question', ''))}"
+                        )
+                    
+                    if question_stats:
+                        st.info(f"📊 This question: {question_stats['total_attempts']} attempts, "
+                               f"{question_stats['correct_count']} correct "
+                               f"({question_stats['success_rate']*100:.1f}% success rate)")
+                    
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        if st.button("✅ Submit Answer", type="primary", key="submit_btn"):
+                            if user_answer and user_answer.strip():
+                                st.session_state[submit_key] = True
+                                
+                                # Record attempt
+                                if ANSWER_TRACKER_AVAILABLE:
+                                    tracker = AnswerTracker()
+                                    result = tracker.record_attempt(
+                                        question_text=question.get('question', ''),
+                                        user_answer=user_answer,
+                                        correct_answer=question.get('answer', ''),
+                                        question_type=question.get('question_type', ''),
+                                        topic=question.get('topic', ''),
+                                        course_code=course_subject
+                                    )
+                                    
+                                    # Show result
+                                    if result['is_correct']:
+                                        st.success(f"✅ Correct! ({result['correct_count']}/{result['total_attempts']} correct so far)")
+                                    else:
+                                        st.error(f"❌ Incorrect. ({result['correct_count']}/{result['total_attempts']} correct so far)")
+                                    
+                                    # Show updated difficulty
+                                    if result['calculated_difficulty']:
+                                        st.info(f"📊 Calculated Difficulty: {result['calculated_difficulty']:.2f} "
+                                               f"(based on {result['total_attempts']} attempts)")
+                                
+                                st.rerun()
+                            else:
+                                st.warning("Please enter an answer before submitting.")
+                    
+                    with col2:
+                        if st.button("🔍 Skip to Answer", type="secondary", key="skip_btn"):
+                            st.session_state[submit_key] = True
+                            st.session_state[answer_key] = True
+                            st.rerun()
+                
                 else:
-                    st.markdown("### Answer")
-                    st.markdown(f'<div class="question-card">{question["answer"]}</div>', unsafe_allow_html=True)
-                    if st.button("🔄 Hide Answer", key="hide_ans_btn"):
-                        st.session_state[answer_key] = False
-                        st.rerun()
+                    # Show correct answer after submission
+                    if not st.session_state[answer_key]:
+                        st.markdown("---")
+                        st.markdown("### Correct Answer")
+                        st.markdown(f'<div class="question-card">{question["answer"]}</div>', unsafe_allow_html=True)
+                        
+                        if st.button("🔄 Try Another Question", key="reset_btn"):
+                            st.session_state[submit_key] = False
+                            st.session_state[answer_key] = False
+                            st.rerun()
+                    else:
+                        # Show answer directly (skip path)
+                        st.markdown("---")
+                        st.markdown("### Correct Answer")
+                        st.markdown(f'<div class="question-card">{question["answer"]}</div>', unsafe_allow_html=True)
+                        
+                        if st.button("🔄 Hide Answer", key="hide_ans_btn"):
+                            st.session_state[answer_key] = False
+                            st.session_state[submit_key] = False
+                            st.rerun()
             
             # Save option
             if st.button("💾 Save Question"):
